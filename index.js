@@ -22,6 +22,7 @@ mongoose
     .connect(mongoURI, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
+        ssl: true,
         serverSelectionTimeoutMS: 30000,
         maxPoolSize: 10,
     })
