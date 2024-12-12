@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            background: #f4f6f8;
+            height: 100vh;
+            display: flex;
+            color: #333;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 300px;
+            background: linear-gradient(135deg, #ee5566, #ff888a);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow-y: auto;
+            color: white;
+        }
+
+        #sidebar h2 {
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #search-bar {
+            margin: 15px 0;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            width: calc(100% - 30px);
+            outline: none;
+            background: #fff;
+            color: #333;
+        }
+
+        #search-bar::placeholder {
+            color: #aaa;
+        }
+
+        #userList {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        #userList::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #userList::-webkit-scrollbar-thumb {
+            background-color: #888;
+            border-radius: 10px;
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            background: white;
+            color: #000000;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .user-card:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .user-card img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            border: 2px solid #ddd;
+        }
+
+        .user-card .info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-card .info .name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .user-card .info .last-message {
+            font-size: 14px;
+            color: #000000;
+            margin-top: 5px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        /* Chat Container */
+        #chat-container {
+            flex: 0.766;
+            display: flex;
+            flex-direction: column;
+            background: #f9f9f9;
+            position: relative;
+        }
+
+        #chat-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #ee5566, #ff888a);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid #ddd;
+        }
+
+        .message {
+            margin: 10px 0;
+            display: flex;
+            position: relative;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .message.admin {
+            justify-content: flex-end;
+        }
+
+        .message.user {
+            justify-content: flex-start;
+        }
+
+        .message .message-text {
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 70%;
+            font-size: 14px;
+            line-height: 1.4;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.admin .message-text {
+            background: #ee5566;
+            color: white;
+        }
+
+        .message.user .message-text {
+            background: #f1f1f1;
+            color: #333;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Input Section */
+        #input-container {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+
+        #replyInput {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 14px;
+            background: #f9f9f9;
+            outline: none;
+        }
+
+        #sendButton {
+            margin-left: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #ee5566, #ff888a);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #sendButton:hover {
+            background: #cc4455;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            width: 300px;
+            background: #ffffff;
+            border-left: 1px solid #ddd;
+            box-shadow: -2px 0 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+
+        .right-panel h3 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        #visitor-info p {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        #visitor-info span {
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Analytics Modal */
+        #analytics-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 400px;
+            animation: slideIn 0.3s ease;
+        }
+
+        #analytics-modal h2 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        #close-analytics {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 15px;
+            background: #ee5566;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #close-analytics:hover {
+            background: #cc4455;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translate(-50%, -70%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 60px;
+            }
+
+            #sidebar h2 {
+                display: none;
+            }
+
+            #search-bar {
+                display: none;
+            }
+
+            .user-card {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .user-card .info {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar">
+        <h2>Customer Chats</h2>
+        <input type="text" id="search-bar" placeholder="Search users..." />
+        <div id="userList"></div>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat-header">
+            <span id="user-name">Select a Customer</span>
+            <button id="analytics-button">View Analytics</button>
+        </div>
+        <div id="messages"></div>
+        <div id="typing-indicator" style="display: none;">User is typing...</div>
+        <div id="input-container">
+            <input type="text" id="replyInput" placeholder="Type your message..." />
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <div id="right-panel" class="right-panel">
+        <h3>User Information</h3>
+        <div id="visitor-info">
+            <p><strong>IP Address:</strong> <span id="ip"></span></p>
+            <p><strong>Location:</strong> <span id="location"></span></p>
+            <p><strong>Timezone:</strong> <span id="timezone"></span></p>
+            <p><strong>Browser:</strong> <span id="browser"></span></p>
+            <p><strong>Device:</strong> <span id="device"></span></p>
+        </div>
+    </div>
+
+    <div id="analytics-modal">
+        <h2>Chat Analytics</h2>
+        <p>Total Messages: <span id="total-messages"></span></p>
+        <p>Active Users: <span id="active-users"></span></p>
+        <p>Resolved Issues: <span id="resolved-issues"></span></p>
+        <button id="close-analytics">Close</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const userList = document.getElementById("userList");
+        const chatHeader = document.getElementById("user-name");
+        const messagesDiv = document.getElementById("messages");
+        const inputContainer = document.getElementById("input-container");
+        const replyInput = document.getElementById("replyInput");
+        const sendButton = document.getElementById("sendButton");
+        const typingIndicator = document.getElementById("typing-indicator");
+        const analyticsButton = document.getElementById("analytics-button");
+        const analyticsModal = document.getElementById("analytics-modal");
+        const closeAnalytics = document.getElementById("close-analytics");
+        const rightPanel = document.getElementById("right-panel");
+        const ipSpan = document.getElementById("ip");
+        const locationSpan = document.getElementById("location");
+        const timezoneSpan = document.getElementById("timezone");
+        const browserSpan = document.getElementById("browser");
+        const deviceSpan = document.getElementById("device");
+
+        const socket = io();
+        let currentUserId = null;
+        const users = {};
+
+        // Helper function to append messages
+        const appendMessage = (message, isAdmin = false, timestamp = new Date()) => {
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${isAdmin ? "admin" : "user"}`;
+
+            const messageText = document.createElement("div");
+            messageText.className = "message-text";
+            messageText.innerText = message;
+
+            const messageMeta = document.createElement("div");
+            messageMeta.className = "message-meta";
+
+            const messageTime = document.createElement("span");
+            messageTime.className = "message-time";
+            messageTime.innerText = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const messageDate = document.createElement("span");
+            messageDate.className = "message-date";
+            messageDate.innerText = timestamp.toLocaleDateString();
+
+            messageMeta.appendChild(messageTime);
+            messageMeta.appendChild(document.createTextNode(" • "));
+            messageMeta.appendChild(messageDate);
+
+            messageDiv.appendChild(messageText);
+            messageDiv.appendChild(messageMeta);
+            messagesDiv.appendChild(messageDiv);
+
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+
+
+        socket.on("typing", (data) => {
+            if (data.userId === currentUserId) {
+                typingIndicator.style.display = data.typing ? "block" : "none";
+            }
+        });
+
+        analyticsButton.addEventListener("click", async () => {
+            const response = await fetch("/admin/analytics");
+            const data = await response.json();
+
+            document.getElementById("total-messages").textContent = data.totalMessages;
+            document.getElementById("active-users").textContent = data.activeUsers;
+            document.getElementById("resolved-issues").textContent = data.resolvedIssues;
+
+            analyticsModal.style.display = "block";
+        });
+
+        closeAnalytics.addEventListener("click", () => {
+            analyticsModal.style.display = "none";
+        });
+
+        const blockUser = async (userId) => {
+            if (confirm(`Are you sure you want to block User ${userId}?`)) {
+                const response = await fetch(`/admin/block-user/${userId}`, { method: "POST" });
+                const result = await response.json();
+                alert(result.message);
+            }
+        };
+        const showVisitorInfo = (visitorInfo) => {
+            if (visitorInfo) {
+                ipSpan.textContent = visitorInfo.ip || "N/A";
+                locationSpan.textContent = `${visitorInfo.city || "Unknown"}, ${visitorInfo.region || "Unknown"}, ${visitorInfo.country || "Unknown"}`;
+                timezoneSpan.textContent = visitorInfo.timezone || "N/A";
+                browserSpan.textContent = `${visitorInfo.browser?.name || "Unknown"} ${visitorInfo.browser?.version || ""}`;
+                deviceSpan.textContent = `${visitorInfo.device?.type || "Unknown"} (${visitorInfo.device?.os || "Unknown"})`;
+
+                // Show the panel
+                rightPanel.style.display = "block";
+            } else {
+                ipSpan.textContent = "N/A";
+                locationSpan.textContent = "N/A";
+                timezoneSpan.textContent = "N/A";
+                browserSpan.textContent = "N/A";
+                deviceSpan.textContent = "N/A";
+
+                // Show the panel even if no data
+                rightPanel.style.display = "block";
+            }
+        };
+
+        // Render the user list dynamically
+        const renderUserList = () => {
+            userList.innerHTML = Object.keys(users)
+                .map((userId) => {
+                    const user = users[userId];
+                    const visitor = user.visitorInfo || {}; // Ensure visitor is always defined
+
+                    return `
+                <div class="user-card" data-user-id="${userId}">
+                    <img src="https://i.pravatar.cc/150?u=${userId}" alt="User Avatar" />
+                    <div class="info">
+                        <div class="name">${user.name || `User ${userId}`}</div>
+                        <div class="last-message">${user.lastMessage || "No messages yet"}</div>
+                        <div class="date">${user.lastMessageDate || ""}</div>
+                        <div class="visitor-info">
+                            <p>Location: ${visitor.city || "Unknown"}, ${visitor.region || "Unknown"}, ${visitor.country || "Unknown"}</p>
+                            <p>Device: ${visitor.device?.type || "Unknown"} (${visitor.device?.os || "Unknown"})</p>
+                            <p>Browser: ${visitor.browser?.name || "Unknown"} ${visitor.browser?.version || ""}</p>
+                        </div>
+                    </div>
+                </div>`;
+                })
+                .join("");
+
+            document.querySelectorAll(".user-card").forEach((card) => {
+                card.addEventListener("click", () => {
+                    const userId = card.getAttribute("data-user-id");
+                    selectUser(card, userId);
+                });
+            });
+        };
+
+
+        const selectUser = (card, userId) => {
+            currentUserId = userId;
+            document.querySelectorAll(".user-card").forEach((c) => c.classList.remove("active"));
+            card.classList.add("active");
+
+            chatHeader.innerText = `Chat with User: ${userId}`;
+            inputContainer.style.display = "flex";
+
+            // Populate messages
+            messagesDiv.innerHTML = users[userId].messages
+                .map((msg) => `
+            <div class="message ${msg.type === "admin" ? "admin" : "user"}">
+                <div class="message-text">${msg.message}</div>
+                <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+            </div>`)
+                .join("");
+
+            // Show visitor info in the right panel
+            const visitorInfo = users[userId].visitorInfo || null;
+            showVisitorInfo(visitorInfo);
+        };
+
+        // Send a message
+        sendButton.addEventListener("click", () => {
+            const message = replyInput.value.trim();
+            if (message && currentUserId) {
+                const timestamp = new Date();
+                socket.emit("adminMessage", { userId: currentUserId, message, timestamp });
+                appendMessage(message, true, timestamp);
+
+                users[currentUserId].messages.push({ message, type: "admin", timestamp });
+                replyInput.value = "";
+            }
+        });
+
+        // Listen for incoming messages
+        socket.on("message", (data) => {
+            if (!users[data.userId]) {
+                users[data.userId] = { messages: [], name: `User ${data.userId}` };
+            }
+
+            users[data.userId].messages.push(data);
+            users[data.userId].lastMessage = data.message;
+            users[data.userId].lastMessageDate = new Date(data.timestamp).toLocaleString();
+
+            if (currentUserId !== data.userId) {
+                renderUserList();
+            } else {
+                appendMessage(data.message, false, new Date(data.timestamp));
+            }
+        });
+
+        // Delete a chat
+        const deleteChat = async (userId) => {
+            if (confirm(`Are you sure you want to delete the chat with User ${userId}?`)) {
+                try {
+                    const response = await fetch(`/admin/delete-chat/${userId}`, { method: "DELETE" });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        delete users[userId];
+                        renderUserList();
+
+                        if (currentUserId === userId) {
+                            currentUserId = null;
+                            chatHeader.innerText = "Select a Customer";
+                            messagesDiv.innerHTML = "";
+                            inputContainer.style.display = "none";
+                        }
+
+                        alert(result.message);
+                    } else {
+                        alert("Failed to delete chat. Please try again.");
+                    }
+                } catch (error) {
+                    console.error("Error deleting chat:", error);
+                    alert("An error occurred while deleting the chat.");
+                }
+            }
+        };
+
+        // Block a user
+
+
+        // Get a conversation link
+        const conversationLink = (userId) => {
+            alert(`Conversation link for User ${userId}: /admin/chat/${userId}`);
+            window.open(`/admin/chat/${userId}`, "_blank");
+        };
+
+        // Mark a conversation as resolved
+        const markAsResolved = async (userId) => {
+            if (confirm(`Mark User ${userId}'s issue as resolved?`)) {
+                try {
+                    const response = await fetch(`/admin/resolve-issue/${userId}`, { method: "POST" });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert(`User ${userId}'s issue has been marked as resolved.`);
+                    } else {
+                        alert("Failed to mark issue as resolved. Please try again.");
+                    }
+                } catch (error) {
+                    console.error("Error marking issue as resolved:", error);
+                    alert("An error occurred while marking the issue as resolved.");
+                }
+            }
+        };
+
+
+
+        // Load messages from the server
+        const loadMessages = async () => {
+            try {
+                const response = await fetch("/admin/messages");
+                const messages = await response.json();
+
+                messages.forEach((msg) => {
+                    if (!users[msg.userId]) {
+                        users[msg.userId] = { messages: [], name: `User ${msg.userId}` };
+                    }
+
+                    users[msg.userId].messages.push(msg);
+                    users[msg.userId].lastMessage = msg.message;
+                    users[msg.userId].lastMessageDate = new Date(msg.timestamp).toLocaleString();
+                });
+
+                renderUserList();
+            } catch (error) {
+                console.error("Error loading messages:", error);
+            }
+        };
+
+        loadMessages();
+
+    </script>
+</body>
+
+</html>

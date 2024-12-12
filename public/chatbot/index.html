@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Chatbot</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Chatbot floating button */
+        #chat-toggle-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #ee5566;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            font-size: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s, background 0.3s;
+        }
+
+        #chat-toggle-button:hover {
+            background: #cc4455;
+            transform: scale(1.1);
+        }
+
+        /* Notification badge */
+        #notification-badge {
+            display: none;
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: #ff0000;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+
+        /* Chatbot container */
+        #chat-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 400px;
+            max-height: 500px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            transform: scale(0);
+            transform-origin: bottom right;
+            transition: transform 0.3s ease-in-out, opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+        }
+
+        #chat-container.open {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* Chat header */
+        #chat-header {
+            background: #ee5566;
+            color: white;
+            padding: 15px;
+            font-size: 18px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        /* Messages section */
+        #messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user img,
+        .message.bot img,
+        .message.admin img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-text {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message.user .message-text {
+            background: #ee5566;
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .message.bot .message-text {
+            background: #f8f9fa;
+            color: black;
+            border-bottom-left-radius: 0;
+        }
+
+        .message.admin .message-text {
+            background: #007bff;
+            color: white;
+            border-bottom-left-radius: 0;
+        }
+
+        /* Input section */
+        #input-container {
+            display: none;
+            align-items: center;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+            background: #ffffff;
+        }
+
+        #input-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #input-container button {
+            margin-left: 10px;
+            background: #ee5566;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #input-container button:hover {
+            background: #cc4455;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Chatbot floating button -->
+    <button id="chat-toggle-button">💬
+        <span id="notification-badge">0</span>
+    </button>
+
+    <!-- Chat container -->
+    <div id="chat-container">
+        <div id="chat-header">ZenBot</div>
+        <div id="messages"></div>
+        <div id="input-container">
+            <input type="text" id="manualInput" placeholder="Type your message here..." />
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <audio id="sendAudio" src="https://www.soundjay.com/button/beep-08b.mp3"></audio>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const chatToggleButton = document.getElementById("chat-toggle-button");
+        const chatContainer = document.getElementById("chat-container");
+        const messagesDiv = document.getElementById("messages");
+        const manualInput = document.getElementById("manualInput");
+        const sendButton = document.getElementById("sendButton");
+        const inputContainer = document.getElementById("input-container");
+        const notificationBadge = document.getElementById("notification-badge");
+        const sendAudio = document.getElementById("sendAudio");
+
+        let unreadMessages = 0; // Tracks unread messages
+        let currentStep = "start";
+        let isManualInput = false;
+        let issueAcknowledged = false;
+        let thankYouAcknowledged = false;
+
+        const socket = io();
+        socket.on("message", (data) => {
+            if (data.type === "admin" && data.userId === socket.id) {
+                appendMessage(data.message, "admin");
+                if (!chatContainer.classList.contains("open")) {
+                    unreadMessages++;
+                    notificationBadge.textContent = unreadMessages;
+                    notificationBadge.style.display = "flex";
+                }
+            }
+        });
+        // Toggles the chat visibility
+        chatToggleButton.addEventListener("click", () => {
+            chatContainer.classList.toggle("open");
+            if (chatContainer.classList.contains("open")) {
+                unreadMessages = 0; // Reset unread messages
+                notificationBadge.style.display = "none";
+            }
+        });
+
+        // Appends a message to the chat
+        const appendMessage = (message, type = "bot") => {
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${type}`;
+
+            const avatar = document.createElement("img");
+            avatar.src = type === "bot"
+                ? "https://cdn-icons-png.flaticon.com/512/4712/4712100.png"
+                : type === "admin"
+                    ? "https://cdn-icons-png.flaticon.com/512/2922/2922510.png"
+                    : "https://cdn-icons-png.flaticon.com/512/2922/2922522.png";
+
+            const messageText = document.createElement("div");
+            messageText.className = "message-text";
+            messageText.innerText = message;
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageText);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            if (!chatContainer.classList.contains("open") && type === "bot") {
+                unreadMessages++;
+                notificationBadge.textContent = unreadMessages;
+                notificationBadge.style.display = "flex";
+            }
+        };
+        
+
+
+
+
+        // Fetches the next question or response from the chatbot
+        const fetchQuestion = (step) => {
+            // Clear existing buttons to prevent duplication
+            const clearButtons = () => {
+                const buttons = messagesDiv.querySelectorAll("button");
+                buttons.forEach((button) => button.remove());
+            };
+
+            // Fetch the question and options from the server
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ step }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    appendMessage(data.question, "bot");
+
+                    // Clear old buttons before rendering new ones
+                    clearButtons();
+
+                    // Render buttons for the options
+                    if (data.options && data.options.length > 0) {
+                        data.options.forEach((option) => {
+                            const button = document.createElement("button");
+                            button.innerText = option.text;
+                            button.style.margin = "5px";
+                            button.style.padding = "10px";
+                            button.style.background = "#ee5566";
+                            button.style.color = "white";
+                            button.style.border = "none";
+                            button.style.borderRadius = "5px";
+                            button.style.cursor = "pointer";
+
+                            button.onclick = () => {
+                                appendMessage(option.text, "user");
+
+                                // Handle manual response input
+                                if (option.id === "manual_response") {
+                                    inputContainer.style.display = "flex";
+                                    isManualInput = true;
+
+                                    // Show "Describe your issue" message only once
+                                    if (!issueAcknowledged) {
+                                        appendMessage("Please describe your issue in detail.", "bot");
+                                        issueAcknowledged = true;
+                                    }
+                                } else {
+                                    fetchQuestion(option.id); // Recursive fetch for next question
+                                }
+                            };
+                       
+                            messagesDiv.appendChild(button);
+                        });
+                    }
+                })
+                .catch(() => appendMessage("Oops! Something went wrong.", "bot"));
+        };
+
+
+        // Handles sending messages from the user
+        sendButton.addEventListener("click", () => {
+            const query = manualInput.value.trim();
+            if (query) {
+                appendMessage(query, "user");
+                fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ manualQuery: query, userId: socket.id }),
+                }).then(() => {
+                    if (!thankYouAcknowledged) {
+                        appendMessage("Thank you for your query. We’ll get back to you shortly.", "bot");
+                        thankYouAcknowledged = true;
+                    }
+                }).catch(() => appendMessage("Oops! Something went wrong.", "bot"));
+
+                manualInput.value = ""; // Clear the input field
+            }
+        });
+
+        // Submits the message on Enter key press
+        manualInput.addEventListener("keypress", (event) => {
+            if (event.key === "Enter") sendButton.click();
+        });
+
+        // Listens for messages from the admin
+
+
+
+        // Starts the chatbot conversation
+        fetchQuestion("start");
+    </script>
+
+</body>
+
+</html>
