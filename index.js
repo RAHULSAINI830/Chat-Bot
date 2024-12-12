@@ -19,14 +19,14 @@ const port = 3000;
 const mongoURI = process.env.MONGO_URI;
 
 mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 30000,
-    maxPoolSize: 10,
-  })
-  .then(() => console.log("Connected to MongoDB!"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+    .connect(mongoURI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        serverSelectionTimeoutMS: 30000,
+        maxPoolSize: 10,
+    })
+    .then(() => console.log("Connected to MongoDB!"))
+    .catch((err) => console.error("MongoDB connection error:", err));
 
 mongoose.connection.on("error", (err) => console.error("MongoDB error:", err));
 
@@ -37,17 +37,17 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Models
 const messageSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  message: { type: String, required: true },
-  type: { type: String, enum: ["user", "admin"], required: true },
-  timestamp: { type: Date, default: Date.now },
+    userId: { type: String, required: true },
+    message: { type: String, required: true },
+    type: { type: String, enum: ["user", "admin"], required: true },
+    timestamp: { type: Date, default: Date.now },
 });
 
 const userSchema = new mongoose.Schema({
-  userId: { type: String, unique: true, required: true },
-  name: { type: String },
-  isBlocked: { type: Boolean, default: false },
-  resolved: { type: Boolean, default: false },
+    userId: { type: String, unique: true, required: true },
+    name: { type: String },
+    isBlocked: { type: Boolean, default: false },
+    resolved: { type: Boolean, default: false },
 });
 
 const fetch = require('node-fetch');
@@ -55,20 +55,21 @@ const userAgent = require('user-agent-parser');
 
 const getVisitorInfo = async (req, res, next) => {
     try {
-        // Get IP address, fallback to localhost if undefined
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+        // Extract IP address
+        const forwardedFor = req.headers['x-forwarded-for']?.split(',')[0];
+        const ip = forwardedFor || req.socket.remoteAddress || '127.0.0.1';
 
         // Fetch geolocation data using ipinfo.io API
         const ipInfoApiKey = "a4e05408bffeb1"; // Replace with your API key
-        const geoResponse = await fetch(`https://ipinfo.io/${ip}?token=${ipInfoApiKey}`);
+        const ipInfoUrl = `https://ipinfo.io/${ip}?token=${ipInfoApiKey}`;
 
-        // Validate response and parse JSON
+        const geoResponse = await fetch(ipInfoUrl);
         if (!geoResponse.ok) {
-            throw new Error(`Failed to fetch IP information: ${geoResponse.statusText}`);
+            throw new Error(`Failed to fetch IP information: HTTP ${geoResponse.status}`);
         }
         const geoData = await geoResponse.json();
 
-        // Parse user-agent header for browser and device information
+        // Parse user-agent header for browser and device details
         const userAgentString = req.headers["user-agent"] || "Unknown";
         const deviceInfo = userAgent(userAgentString);
 
@@ -80,21 +81,21 @@ const getVisitorInfo = async (req, res, next) => {
             country: geoData.country || "Unknown",
             timezone: geoData.timezone || "Unknown",
             browser: {
-                name: deviceInfo.browser.name || "Unknown",
-                version: deviceInfo.browser.version || "Unknown",
+                name: deviceInfo.browser?.name || "Unknown",
+                version: deviceInfo.browser?.version || "Unknown",
             },
             device: {
-                type: deviceInfo.device.type || "Desktop",
-                os: deviceInfo.os.name || "Unknown",
+                type: deviceInfo.device?.type || "Desktop",
+                os: deviceInfo.os?.name || "Unknown",
             },
         };
 
         console.log("Visitor Info:", req.visitorInfo); // Log for debugging
-        next(); // Proceed to the next middleware or route handler
-    } catch (err) {
-        console.error("Error fetching visitor info:", err);
+        next(); // Proceed to the next middleware
+    } catch (error) {
+        console.error("Error fetching visitor info:", error.message);
 
-        // Attach default values if fetching fails
+        // Attach fallback/default values in case of failure
         req.visitorInfo = {
             ip: "Unknown",
             city: "Unknown",
@@ -111,119 +112,120 @@ const getVisitorInfo = async (req, res, next) => {
             },
         };
 
-        next(); // Continue even if visitor info fails
+        next(); // Continue processing the request even if visitor info is unavailable
     }
 };
 
 // Apply the middleware to all chatbot routes
 app.use("/chat", getVisitorInfo);
 
+
 const Message = mongoose.model("Message", messageSchema);
 const User = mongoose.model("User", userSchema);
 
 // WebSocket Handling
 io.on("connection", (socket) => {
-  console.log("Admin connected");
+    console.log("Admin connected");
 
-  socket.on("join", (userId) => {
-    socket.join(userId);
-  });
+    socket.on("join", (userId) => {
+        socket.join(userId);
+    });
 
-  socket.on("typing", (data) => {
-    socket.to(data.userId).emit("typing", { userId: data.userId, typing: data.typing });
-  });
+    socket.on("typing", (data) => {
+        socket.to(data.userId).emit("typing", { userId: data.userId, typing: data.typing });
+    });
 
-  socket.on("adminMessage", async (data) => {
-    try {
-      const message = new Message({
-        userId: data.userId,
-        message: data.message,
-        type: "admin",
-      });
-      await message.save();
-      socket.to(data.userId).emit("message", message);
-    } catch (error) {
-      console.error("Error saving admin message:", error);
-    }
-  });
+    socket.on("adminMessage", async (data) => {
+        try {
+            const message = new Message({
+                userId: data.userId,
+                message: data.message,
+                type: "admin",
+            });
+            await message.save();
+            socket.to(data.userId).emit("message", message);
+        } catch (error) {
+            console.error("Error saving admin message:", error);
+        }
+    });
 
-  socket.on("disconnect", () => {
-    console.log("Admin disconnected");
-  });
+    socket.on("disconnect", () => {
+        console.log("Admin disconnected");
+    });
 });
 
 // Middleware to Check User Blocking
 const checkUserBlocking = async (req, res, next) => {
-  try {
-    const { userId } = req.body;
-    const user = await User.findOne({ userId });
+    try {
+        const { userId } = req.body;
+        const user = await User.findOne({ userId });
 
-    if (user && user.isBlocked) {
-      return res.status(403).json({ error: "User is blocked." });
+        if (user && user.isBlocked) {
+            return res.status(403).json({ error: "User is blocked." });
+        }
+
+        next();
+    } catch (err) {
+        console.error("Error in user blocking middleware:", err);
+        res.status(500).json({ error: "Internal Server Error" });
     }
-
-    next();
-  } catch (err) {
-    console.error("Error in user blocking middleware:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
 };
 
 // Routes
 
 // Chatbot Logic
 app.post("/chat", checkUserBlocking, async (req, res) => {
-  const { step, manualQuery, userId } = req.body;
+    const { step, manualQuery, userId } = req.body;
 
-  if (manualQuery) {
-    try {
-      const message = new Message({
-        userId,
-        message: manualQuery,
-        type: "user",
-      });
-      await message.save();
+    if (manualQuery) {
+        try {
+            const message = new Message({
+                userId,
+                message: manualQuery,
+                type: "user",
+            });
+            await message.save();
 
-      io.emit("message", {
-        userId,
-        message: manualQuery,
-        type: "user",
-        timestamp: message.timestamp,
-      });
+            io.emit("message", {
+                userId,
+                message: manualQuery,
+                type: "user",
+                timestamp: message.timestamp,
+            });
 
-      res.json({
-        response: "Thank you for your query. We’ll get back to you shortly.",
-      });
-    } catch (err) {
-      console.error("Error saving user message:", err);
-      res.status(500).json({ error: "Failed to save message." });
+            res.json({
+                response: "Thank you for your query. We’ll get back to you shortly.",
+            });
+        } catch (err) {
+            console.error("Error saving user message:", err);
+            res.status(500).json({ error: "Failed to save message." });
+        }
+        return;
     }
-    return;
-  }
 
-  const currentQuestion = questionTree[step] || {
-    question: "Sorry, I didn’t understand that. Could you rephrase?",
-    options: [],
-  };
+    const currentQuestion = questionTree[step] || {
+        question: "Sorry, I didn’t understand that. Could you rephrase?",
+        options: [],
+    };
 
-  res.json({
-    question: currentQuestion.question,
-    options: currentQuestion.options,
-  });
+    res.json({
+        question: currentQuestion.question,
+        options: currentQuestion.options,
+    });
 });
 
 
 // Delete Chat by User ID
 app.delete("/admin/delete-chat/:userId", async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  try {
-    await Message.deleteMany({ userId });
-    res.json({ success: true, message: `Chat for user ${userId} has been deleted.` });
-  } catch (err) {
-    console.error("Error deleting chat:", err);
-    res.status(500).json({ error: "Failed to delete chat." });
-  }
+    try {
+        await Message.deleteMany({ userId });
+        res.json({ success: true, message: `Chat for user ${userId} has been deleted.` });
+    } catch (err) {
+        console.error("Error deleting chat:", err);
+        res.status(500).json({ error: "Failed to delete chat." });
+    }
 });
 app.get('/admin/messages', async (req, res) => {
     try {
@@ -274,28 +276,28 @@ app.post("/chat", async (req, res) => {
 
 // Block User
 app.post("/admin/block-user/:userId", async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  try {
-    await User.updateOne({ userId }, { $set: { isBlocked: true } }, { upsert: true });
-    res.json({ success: true, message: `User ${userId} has been blocked.` });
-  } catch (err) {
-    console.error("Error blocking user:", err);
-    res.status(500).json({ error: "Failed to block user." });
-  }
+    try {
+        await User.updateOne({ userId }, { $set: { isBlocked: true } }, { upsert: true });
+        res.json({ success: true, message: `User ${userId} has been blocked.` });
+    } catch (err) {
+        console.error("Error blocking user:", err);
+        res.status(500).json({ error: "Failed to block user." });
+    }
 });
 
 // Resolve User Issue
 app.post("/admin/resolve-issue/:userId", async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  try {
-    await User.updateOne({ userId }, { $set: { resolved: true } }, { upsert: true });
-    res.json({ success: true, message: `Issue for user ${userId} has been resolved.` });
-  } catch (err) {
-    console.error("Error resolving issue:", err);
-    res.status(500).json({ error: "Failed to resolve issue." });
-  }
+    try {
+        await User.updateOne({ userId }, { $set: { resolved: true } }, { upsert: true });
+        res.json({ success: true, message: `Issue for user ${userId} has been resolved.` });
+    } catch (err) {
+        console.error("Error resolving issue:", err);
+        res.status(500).json({ error: "Failed to resolve issue." });
+    }
 });
 
 // Admin Analytics Endpoint
@@ -521,5 +523,5 @@ const questionTree = {
 
 // Start Server
 server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });
